@@ -37,6 +37,25 @@ if errorlevel 1 (
     exit /b 1
 )
 
+REM --- First run: install dependencies if node_modules is missing ---
+if not exist "%APPDIR%\node_modules" (
+    echo   First run detected - installing dependencies. This can take
+    echo   a few minutes. Please wait...
+    echo.
+    call npm install
+    if errorlevel 1 (
+        echo.
+        echo   ERROR: npm install failed. Check your internet connection
+        echo   and try again.
+        echo.
+        pause
+        exit /b 1
+    )
+    echo.
+    echo   Dependencies installed.
+    echo.
+)
+
 REM --- Wait (in the background) until the server responds, then open the browser ---
 start "" /b powershell -NoProfile -WindowStyle Hidden -Command ^
   "for($i=0; $i -lt 60; $i++){ try { Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 '%URL%' | Out-Null; break } catch { Start-Sleep -Milliseconds 500 } }; Start-Process '%URL%'"
