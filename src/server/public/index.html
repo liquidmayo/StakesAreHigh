@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OUPS Ticket Sampler</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --ink: #1a2330; --muted: #64748b;
+    --accent: #b45309; --line: #e2e8f0; --accent-soft: #fef3e2;
+    --bad: #b91c1c; --bad-soft: #fee2e2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #10151d; --card: #1a2230; --ink: #e5eaf2; --muted: #8fa0b5;
+      --accent: #f59e0b; --line: #2a3547; --accent-soft: #2c2416;
+      --bad: #fca5a5; --bad-soft: #3f1d1d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 1150px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 16px; font-size: 13px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+  .tab {
+    background: var(--card); border: 1px solid var(--line); color: var(--muted);
+    border-radius: 8px 8px 0 0; padding: 8px 18px; cursor: pointer; font-weight: 600;
+  }
+  .tab.active { color: var(--ink); border-bottom: 2px solid var(--accent); }
+  form {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: end;
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px;
+  }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+  input, select, button {
+    font: inherit; color: inherit; background: var(--bg);
+    border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px;
+  }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .member { width: 110px; text-transform: uppercase; }
+  button.go {
+    background: var(--accent); color: #fff; border: none; cursor: pointer;
+    padding: 8px 18px; font-weight: 600;
+  }
+  button.go:disabled { opacity: .6; cursor: wait; }
+  #summary { margin: 16px 2px 8px; font-size: 14px; color: var(--muted); min-height: 21px; }
+  #summary strong { color: var(--ink); }
+  #error {
+    display: none; margin: 16px 0; padding: 10px 14px; border-radius: 8px;
+    background: var(--bad-soft); color: var(--bad); white-space: pre-wrap;
+  }
+  table { width: 100%; border-collapse: collapse; background: var(--card);
+    border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); font-size: 13px; }
+  th { background: var(--accent-soft); font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  tbody tr.row { cursor: pointer; }
+  tbody tr.row:hover { background: var(--accent-soft); }
+  td.num { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .code-badge {
+    display: inline-block; padding: 0 7px; margin-right: 4px; border-radius: 10px;
+    background: var(--accent-soft); border: 1px solid var(--line);
+    font: 11px/1.7 ui-monospace, Consolas, monospace;
+  }
+  .code-badge.hot { background: var(--bad-soft); color: var(--bad); border-color: var(--bad); }
+  tr.detail td { background: var(--bg); padding: 14px; }
+  pre {
+    margin: 0; white-space: pre-wrap; word-break: break-word;
+    font: 12px/1.45 ui-monospace, Consolas, monospace; max-height: 420px; overflow: auto;
+  }
+  .resp-table { margin-top: 12px; }
+  .resp-table caption { text-align: left; font-size: 12px; color: var(--muted); padding: 4px 0; }
+  .tablewrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<main>
+  <h1>OUPS Ticket Sampler</h1>
+  <p class="sub">OHIO811 (CENTER LOGiX) tickets by member code — random samples, response codes, past-due list.</p>
+
+  <div class="tabs">
+    <button class="tab active" id="tab-search" type="button">Date-range sample</button>
+    <button class="tab" id="tab-due" type="button">Past due</button>
+  </div>
+
+  <form id="form-search">
+    <label>Member code
+      <input id="member" class="member" required placeholder="IFNP">
+    </label>
+    <label>From
+      <input id="start" type="date" required>
+    </label>
+    <label>To
+      <input id="end" type="date" required>
+    </label>
+    <label>Response code
+      <select id="codeFilter">
+        <option value="">Any / none</option>
+      </select>
+    </label>
+    <label>Sample size
+      <select id="sample">
+        <option value="10">10</option>
+        <option value="25" selected>25</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+        <option value="0">All</option>
+      </select>
+    </label>
+    <button class="go" type="submit">Search</button>
+  </form>
+
+  <form id="form-due" hidden>
+    <label>Member code
+      <input id="member-due" class="member" required placeholder="IFNP">
+    </label>
+    <label>Status
+      <select id="dueMode">
+        <option value="late" selected>Past due (late)</option>
+        <option value="pending">Pending (due, not answered)</option>
+        <option value="responded">Responded</option>
+        <option value="all">All on due list</option>
+      </select>
+    </label>
+    <button class="go" type="submit">Search</button>
+  </form>
+
+  <div id="error"></div>
+  <div id="summary"></div>
+  <div class="tablewrap">
+    <table id="results" hidden>
+      <thead><tr id="head"></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmtDT = (s) => esc((s || "").replace("T", " ").slice(0, 16));
+
+let codeDescriptions = {};
+
+// Defaults: last 7 days, member code from .env, response codes from API
+(async () => {
+  const today = new Date();
+  const weekAgo = new Date(today); weekAgo.setDate(today.getDate() - 7);
+  $("end").value = today.toISOString().slice(0, 10);
+  $("start").value = weekAgo.toISOString().slice(0, 10);
+  try {
+    const cfg = await (await fetch("/app/config")).json();
+    if (cfg.memberCode) { $("member").value = cfg.memberCode; $("member-due").value = cfg.memberCode; }
+  } catch {}
+  try {
+    const codes = await (await fetch("/app/codes")).json();
+    for (const c of codes) {
+      codeDescriptions[c.code] = c.description;
+      const opt = document.createElement("option");
+      opt.value = c.code;
+      opt.textContent = `${c.code} — ${c.description.slice(0, 60)}`;
+      $("codeFilter").appendChild(opt);
+    }
+  } catch {}
+})();
+
+// Tabs
+function setTab(which) {
+  $("tab-search").classList.toggle("active", which === "search");
+  $("tab-due").classList.toggle("active", which === "due");
+  $("form-search").hidden = which !== "search";
+  $("form-due").hidden = which !== "due";
+  $("results").hidden = true;
+  $("summary").textContent = "";
+  $("error").style.display = "none";
+}
+$("tab-search").addEventListener("click", () => setTab("search"));
+$("tab-due").addEventListener("click", () => setTab("due"));
+
+async function run(form, url, render) {
+  const btn = form.querySelector("button.go");
+  btn.disabled = true;
+  $("error").style.display = "none";
+  $("summary").textContent = "Searching…";
+  $("results").hidden = true;
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    render(data);
+  } catch (err) {
+    $("summary").textContent = "";
+    $("error").textContent = err.message;
+    $("error").style.display = "block";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+$("form-search").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const qs = new URLSearchParams({
+    member: $("member").value.trim(),
+    start: $("start").value,
+    end: $("end").value,
+    sample: $("sample").value,
+    code: $("codeFilter").value,
+  });
+  run(e.target, "/app/search?" + qs, renderSearch);
+});
+
+$("form-due").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const qs = new URLSearchParams({
+    member: $("member-due").value.trim(),
+    mode: $("dueMode").value,
+  });
+  run(e.target, "/app/due?" + qs, renderDue);
+});
+
+function codeBadges(list, hotCode) {
+  if (!list || !list.length) return '<span class="code-badge">—</span>';
+  return list.map((r) => {
+    const title = `${r.code} by ${r.responded_by || "?"} at ${(r.responded_at || "").slice(0, 16).replace("T", " ")}`;
+    const hot = hotCode && r.code === hotCode ? " hot" : "";
+    return `<span class="code-badge${hot}" title="${esc(title)}">${esc(r.code)}</span>`;
+  }).join("");
+}
+
+function renderSearch(data) {
+  const member = $("member").value.trim().toUpperCase();
+  let text = `<strong>${data.matched}</strong> ticket${data.matched === 1 ? "" : "s"} involve <strong>${esc(member)}</strong> in this range`;
+  if (data.codeFilter) {
+    text += `; <strong>${data.filtered}</strong> with a ${esc(data.codeFilter)} response`;
+  }
+  if (data.sampled < data.filtered) {
+    text += ` — showing a random sample of <strong>${data.sampled}</strong>`;
+  }
+  $("summary").innerHTML = text + ".";
+
+  $("head").innerHTML =
+    "<th>Ticket</th><th>Rev</th><th>Created</th><th>Resp. codes</th><th>Type</th><th>Work type</th>" +
+    "<th>Street</th><th>Place</th><th>County</th><th>Excavator</th>";
+  const tbody = $("results").querySelector("tbody");
+  tbody.innerHTML = "";
+  for (const t of data.tickets) {
+    const tr = document.createElement("tr");
+    tr.className = "row";
+    tr.innerHTML =
+      `<td class="num">${esc(t.ticket)}</td><td class="num">${esc(t.revision)}</td>` +
+      `<td class="num">${fmtDT(t.created_at)}</td>` +
+      `<td>${codeBadges(t.my_responses, data.codeFilter || "004")}</td>` +
+      `<td>${esc(t.type || t.category)}</td><td>${esc(t.work_type)}</td>` +
+      `<td>${esc(t.street)}</td><td>${esc(t.place)}</td><td>${esc(t.county)}</td>` +
+      `<td>${esc(t.excavator_name || t.done_for)}</td>`;
+    tr.addEventListener("click", () => toggleDetail(tr, t, 10));
+    tbody.appendChild(tr);
+  }
+  $("results").hidden = data.tickets.length === 0;
+}
+
+function renderDue(data) {
+  const member = $("member-due").value.trim().toUpperCase();
+  const label = { late: "past due", pending: "pending", responded: "responded", all: "on the due list" }[data.mode];
+  $("summary").innerHTML =
+    `<strong>${data.count}</strong> ticket${data.count === 1 ? "" : "s"} ${label} for <strong>${esc(member)}</strong>.`;
+
+  $("head").innerHTML =
+    "<th>Ticket</th><th>Rev</th><th>Type</th><th>Due at</th><th>Code so far</th>" +
+    "<th>Responded by</th><th>Address</th><th>Place</th><th>County</th><th>Priority</th>";
+  const tbody = $("results").querySelector("tbody");
+  tbody.innerHTML = "";
+  for (const t of data.tickets) {
+    const tr = document.createElement("tr");
+    tr.className = "row";
+    const code = t.responsecode
+      ? `<span class="code-badge">${esc(t.responsecode)}</span>`
+      : '<span class="code-badge hot">none</span>';
+    tr.innerHTML =
+      `<td class="num">${esc(t.ticket)}</td><td class="num">${esc(t.revision)}</td>` +
+      `<td>${esc(t.type)}</td><td class="num">${fmtDT(t.response_due_at)}</td>` +
+      `<td>${code}</td><td>${esc(t.whoresponded || t.responded_by)}</td>` +
+      `<td>${esc(t.address)}</td><td>${esc(t.place)}</td><td>${esc(t.county)}</td>` +
+      `<td>${esc(t.priority)}</td>`;
+    tr.addEventListener("click", () => toggleDetail(tr, t, 10));
+    tbody.appendChild(tr);
+  }
+  $("results").hidden = data.tickets.length === 0;
+}
+
+async function toggleDetail(row, t, colspan) {
+  const next = row.nextElementSibling;
+  if (next && next.classList.contains("detail")) { next.remove(); return; }
+  const tr = document.createElement("tr");
+  tr.className = "detail";
+  tr.innerHTML = `<td colspan="${colspan}"><pre>Loading ticket ${esc(t.ticket)}…</pre></td>`;
+  row.after(tr);
+  const td = tr.querySelector("td");
+  try {
+    const res = await fetch(`/app/ticket/${encodeURIComponent(t.ticket)}?revision=${encodeURIComponent(t.revision ?? "")}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    const text = data.formatted || JSON.stringify(data.detail, null, 2) || "No detail available.";
+    let html = `<pre>${esc(text)}</pre>`;
+    const responses = data.detail && data.detail[0] && data.detail[0].responses;
+    if (Array.isArray(responses) && responses.length) {
+      const rows = responses
+        .slice()
+        .sort((a, b) => ((a.responded_at || "") < (b.responded_at || "") ? -1 : 1))
+        .map((r) =>
+          `<tr><td class="num">${esc(r.member_code)}</td>` +
+          `<td><span class="code-badge${r.code === "004" ? " hot" : ""}" title="${esc(codeDescriptions[r.code] || "")}">${esc(r.code)}</span></td>` +
+          `<td class="num">${esc(r.revision)}</td><td class="num">${fmtDT(r.responded_at)}</td>` +
+          `<td>${esc(r.responded_by)}</td><td>${esc(r.comments || "")}</td></tr>`,
+        )
+        .join("");
+      html +=
+        `<table class="resp-table"><caption>All member responses on ticket ${esc(t.ticket)}</caption>` +
+        `<thead><tr><th>Member</th><th>Code</th><th>Rev</th><th>Responded at</th><th>By</th><th>Comments</th></tr></thead>` +
+        `<tbody>${rows}</tbody></table>`;
+    } else if (Array.isArray(responses)) {
+      html += `<p class="sub" style="margin-top:10px">No responses posted on this ticket yet.</p>`;
+    }
+    td.innerHTML = html;
+  } catch (err) {
+    td.innerHTML = `<pre>Failed to load: ${esc(err.message)}</pre>`;
+  }
+}
+</script>
+</body>
+</html>
